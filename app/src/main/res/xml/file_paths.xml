@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <external-path name="my_images" path="Android/data/cl.duoc.appacientes/files/Pictures" />
+    <files-path name="my_internal_images" path="." />
+</paths>
