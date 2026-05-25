@@ -125,6 +125,16 @@ interface AtencionDao {
         ORDER BY fechaHora DESC
     """)
     fun entreFechas(inicio: Long, fin: Long): Flow<List<AtencionPaciente>>
+
+    @Query("""
+        SELECT * FROM atenciones 
+        WHERE LOWER(nombre) LIKE '%' || LOWER(:query) || '%'
+        OR LOWER(rut) LIKE '%' || LOWER(:query) || '%'
+        GROUP BY rut, nombre
+        ORDER BY fechaHora DESC
+        LIMIT 5
+    """)
+    suspend fun obtenerSugerencias(query: String): List<AtencionPaciente>
 }
 
 @Database(entities = [AtencionPaciente::class], version = 1, exportSchema = false)
@@ -149,6 +159,19 @@ abstract class AppDatabase : RoomDatabase() {
 // -----------------------------------------------------
 // REPOSITORIO Y VIEWMODEL
 // -----------------------------------------------------
+
+class PacientesViewModel(private val repo: AtencionRepository) : ViewModel() {
+    val todas = repo.todas
+    val hoy = repo.atencionesHoy()
+    
+    fun atencionesMes(mes: Int, anio: Int) = repo.atencionesMes(mes, anio)
+
+    fun buscar(texto: String) = repo.buscar(texto)
+    suspend fun guardar(atencion: AtencionPaciente) = repo.guardar(atencion)
+    suspend fun eliminar(atencion: AtencionPaciente) = repo.eliminar(atencion)
+
+    suspend fun obtenerSugerencias(query: String) = repo.obtenerSugerencias(query)
+}
 
 class AtencionRepository(private val dao: AtencionDao) {
     val todas = dao.obtenerTodas()
@@ -176,17 +199,8 @@ class AtencionRepository(private val dao: AtencionDao) {
     suspend fun eliminar(atencion: AtencionPaciente) {
         dao.eliminar(atencion)
     }
-}
 
-class PacientesViewModel(private val repo: AtencionRepository) : ViewModel() {
-    val todas = repo.todas
-    val hoy = repo.atencionesHoy()
-    
-    fun atencionesMes(mes: Int, anio: Int) = repo.atencionesMes(mes, anio)
-
-    fun buscar(texto: String) = repo.buscar(texto)
-    suspend fun guardar(atencion: AtencionPaciente) = repo.guardar(atencion)
-    suspend fun eliminar(atencion: AtencionPaciente) = repo.eliminar(atencion)
+    suspend fun obtenerSugerencias(query: String) = dao.obtenerSugerencias(query)
 }
 
 class PacientesViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
@@ -463,6 +477,21 @@ fun RegistroScreen(vm: PacientesViewModel, editando: AtencionPaciente?, onGuarda
     var fotoUri by remember(editando) { mutableStateOf(editando?.fotoCredencialUri ?: "") }
     var mensaje by remember { mutableStateOf("") }
 
+    // Sugerencias de autocompletado
+    var sugerencias by remember { mutableStateOf<List<AtencionPaciente>>(emptyList()) }
+    
+    LaunchedEffect(nombre, rut) {
+        if (editando == null) {
+            val query = if (rut.length > 2) rut else if (nombre.length > 2) nombre else ""
+            if (query.isNotBlank()) {
+                delay(300)
+                sugerencias = vm.obtenerSugerencias(query)
+            } else {
+                sugerencias = emptyList()
+            }
+        }
+    }
+
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { fotoUri = copiarImagenInterna(context, it) }
     }
@@ -513,6 +542,45 @@ fun RegistroScreen(vm: PacientesViewModel, editando: AtencionPaciente?, onGuarda
                     SeccionTitulo("Datos del Paciente", Icons.Default.Person)
                     CampoTexto("Nombre Completo", nombre) { nombre = it }
                     CampoTexto("RUT", rut) { rut = it }
+
+                    AnimatedVisibility(visible = sugerencias.isNotEmpty() && editando == null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFE1F5FE), RoundedCornerShape(12.dp))
+                                .padding(8.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Text("¿Es uno de estos pacientes?", modifier = Modifier.weight(1f), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0288D1))
+                                Icon(
+                                    Icons.Default.Close, 
+                                    null, 
+                                    modifier = Modifier.size(16.dp).clickable { sugerencias = emptyList() },
+                                    tint = Color.Gray
+                                )
+                            }
+                            sugerencias.forEach { sug ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            nombre = sug.nombre
+                                            rut = sug.rut
+                                            sexo = sug.sexo
+                                            piso = sug.piso
+                                            empresa = sug.empresa
+                                            sugerencias = emptyList()
+                                        }
+                                        .padding(vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.History, null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("${sug.nombre} (${sug.rut})", fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
                     
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CampoTexto("Piso", piso, Modifier.weight(1f)) { piso = it }
