@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "376028021091",
+    "project_id": "apppacientes-b6811",
+    "storage_bucket": "apppacientes-b6811.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:376028021091:android:3eb54c90731b1e5f51d356",
+        "android_client_info": {
+          "package_name": "cl.duoc.appacientes"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZ4lgnoUZxLv_6bobDUxj8CDVNiE_kTDE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
